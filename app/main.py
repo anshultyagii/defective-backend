@@ -1,0 +1,81 @@
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from app.api.module_a import router as module_a_router
+from app.api.module_b import router as module_b_router
+from app.api.screening import router as screening_router
+
+from app.core.logging_config import setup_logging
+from app.core.model_manager import ModelManager
+from app.api.models import router as models_router
+# ==========================================
+# LOGGING
+# ==========================================
+
+setup_logging()
+
+logger = logging.getLogger(__name__)
+
+
+# ==========================================
+# FASTAPI APPLICATION
+# ==========================================
+
+app = FastAPI(
+    title="Burn-In Intelligence API",
+    description="ML-based electronic component burn-in screening system",
+    version="0.1.0"
+)
+model_manager = ModelManager()
+model_manager.load_models()
+
+# ==========================================
+# GLOBAL EXCEPTION HANDLER
+# ==========================================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(
+    request: Request,
+    exc: Exception
+):
+
+    logger.exception(
+        "Unhandled server error | path=%s | error=%s",
+        request.url.path,
+        exc
+    )
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "message": "Internal server error.",
+            "path": request.url.path
+        }
+    )
+
+
+# ==========================================
+# HEALTH CHECK
+# ==========================================
+
+@app.get("/health")
+def health_check():
+
+    return {
+        "status": "healthy",
+        "service": "burn-in-intelligence-api",
+        "version": "0.1.0"
+    }
+
+
+# ==========================================
+# ROUTES
+# ==========================================
+
+app.include_router(module_a_router)
+app.include_router(module_b_router)
+app.include_router(screening_router)
+app.include_router(models_router)
